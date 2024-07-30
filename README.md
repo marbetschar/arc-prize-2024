@@ -11,3 +11,7 @@ Your work could contribute to new AI problem-solving applicable across industrie
 Create an AI capable of solving reasoning tasks it has never seen before
 
 For more information see: https://www.kaggle.com/competitions/arc-prize-2024
+
+## I-JEPA with MLP
+
+https://github.com/facebookresearch/ijepa
