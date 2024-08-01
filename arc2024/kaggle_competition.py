@@ -1,3 +1,5 @@
+from typing import Dict, List
+
 import kaggle
 import json
 from zipfile import ZipFile
@@ -5,7 +7,6 @@ import os
 import shutil
 
 import torch
-import torchvision
 
 from pathlib import Path
 
@@ -17,49 +18,10 @@ def json_file_read(file_path: Path):
     return json_data
 
 
-def image_to_tensor(path: Path):
-    return torchvision.io.read_image(
-        path=str(path),
-        mode=torchvision.io.image.ImageReadMode.UNCHANGED
-    )
-
-
-def tensor_to_image(image_path_without_extension: Path, input: torch.Tensor, permutations: bool = False):
-    torchvision.io.write_png(
-        input=input,
-        filename=str(
-            image_path_without_extension.with_name(
-                f"{image_path_without_extension.name}-0"
-            ).with_suffix('.png')
-        ),
-        compression_level=0
-    )
-
-    if permutations:
-        k = 0
-        for i in range(1, 11, 1):
-            input_permutated = (torch.clone(input).squeeze(0) + i) % 10
-            input_permutated = input_permutated.unsqueeze(0)
-
-            if torch.equal(input, input_permutated):
-                continue
-            k += 1
-
-            torchvision.io.write_png(
-                input=input_permutated,
-                filename=str(
-                    image_path_without_extension.with_name(
-                        f"{image_path_without_extension.name}-{k}"
-                    ).with_suffix('.png')
-                ),
-                compression_level=0
-            )
-
-
 def download_files(
-        dataset_dir: Path,
-        competition: str = 'arc-prize-2024',
-        force: bool = False
+    dataset_dir: Path,
+    competition: str = 'arc-prize-2024',
+    force: bool = False
 ):
     if not force and dataset_dir.is_dir() and len(os.listdir(dataset_dir)) > 1:
         return
@@ -78,93 +40,81 @@ def download_files(
         raise f"Error downloading zip file from kaggle competition {competition}"
     else:
         with ZipFile(zip_file_path, 'r') as zip_file_handle:
-            zip_file_handle.extractall(dataset_dir / 'json')
+            zip_file_handle.extractall(dataset_dir)
         os.remove(zip_file_path)
 
-    training_challenges = json_file_read(dataset_dir / 'json/arc-agi_training_challenges.json')
-    training_solutions = json_file_read(dataset_dir / 'json/arc-agi_training_solutions.json')
-    challenges_and_solutions_to_png(
-        working_dir=dataset_dir / 'training',
-        challenges_json=training_challenges,
-        solutions_json=training_solutions,
-        permutations=True,
-        force=force
-    )
 
-    evaluation_challenges = json_file_read(dataset_dir / 'json/arc-agi_evaluation_challenges.json')
-    evaluation_solutions = json_file_read(dataset_dir / 'json/arc-agi_evaluation_solutions.json')
-    challenges_and_solutions_to_png(
-        working_dir=dataset_dir / 'evaluation',
-        challenges_json=evaluation_challenges,
-        solutions_json=evaluation_solutions,
-        permutations=False,
-        force=force
-    )
+def tensor_permutations(input: torch.Tensor) -> List[torch.Tensor]:
+    tensors_permutated = []
+
+    for i in range(1, 11, 1):
+        input_permutated = (torch.clone(input).squeeze(0) + i) % 10
+        input_permutated = input_permutated.unsqueeze(0)
+
+        if torch.equal(input, input_permutated):
+            continue
+
+        tensors_permutated.append(input_permutated)
+
+    return tensors_permutated
 
 
-def challenge_and_solution_to_png(
-        working_dir: Path,
-        challenge_id: str,
-        train_json,
-        test_json,
-        solution_json,
-        permutations: bool = False
+def challenge_and_solution_to_tensors(
+    train_json,
+    test_json,
+    solution_json,
+    permutations: bool = False
 ):
-    challenge_dir = working_dir / challenge_id
-
-    support_set_inputs_dir = challenge_dir / 'support-set_inputs'
-    support_set_outputs_dir = challenge_dir / 'support-set_outputs'
-
-    query_inputs_dir = challenge_dir / 'query_inputs'
-    query_outputs_dir = challenge_dir / 'query_outputs'
-
-    for d in [support_set_inputs_dir, support_set_outputs_dir, query_inputs_dir, query_outputs_dir]:
-        if not os.path.exists(d):
-            os.makedirs(d)
+    support_set_inputs = []
+    support_set_outputs = []
+    query_inputs = []
+    query_outputs = []
 
     for i, train in enumerate(train_json):
-        tensor_to_image(
-            support_set_inputs_dir / str(i),
-            torch.tensor(train['input'], dtype=torch.uint8).unsqueeze(0),
-            permutations
-        )
-        tensor_to_image(
-            support_set_outputs_dir / str(i),
-            torch.tensor(train['output'], dtype=torch.uint8).unsqueeze(0),
-            permutations
-        )
+        support_set_input = torch.tensor(train['input'], dtype=torch.uint8).unsqueeze(0)
+        support_set_output = torch.tensor(train['output'], dtype=torch.uint8).unsqueeze(0)
+
+        support_set_inputs.append(support_set_input)
+        support_set_outputs.append(support_set_output)
+
+        if permutations:
+            support_set_inputs += tensor_permutations(support_set_input)
+            support_set_outputs += tensor_permutations(support_set_output)
 
     for i, test in enumerate(test_json):
-        tensor_to_image(
-            query_inputs_dir / str(i),
-            torch.tensor(test['input'], dtype=torch.uint8).unsqueeze(0),
-            permutations
-        )
-        tensor_to_image(
-            query_outputs_dir / str(i),
-            torch.tensor(solution_json[i], dtype=torch.uint8).unsqueeze(0),
-            permutations
-        )
+        query_input = torch.tensor(test['input'], dtype=torch.uint8).unsqueeze(0)
+        query_output = torch.tensor(solution_json[i], dtype=torch.uint8).unsqueeze(0)
+
+        query_inputs.append(query_input)
+        query_outputs.append(query_output)
+
+        if permutations:
+            query_inputs += tensor_permutations(query_input)
+            query_outputs += tensor_permutations(query_output)
+
+    return support_set_inputs, support_set_outputs, query_inputs, query_outputs
 
 
-def challenges_and_solutions_to_png(
-        working_dir: Path,
-        challenges_json,
-        solutions_json,
-        permutations: bool = False,
-        force: bool = False
-):
-    if not force and working_dir.is_dir():
-        return
-    elif working_dir.is_dir():
-        shutil.rmtree(working_dir)
+def challenges_and_solutions_to_tensors(
+    challenges_json,
+    solutions_json,
+    permutations: bool = False
+) -> Dict[str, Dict[str, List[torch.Tensor]]]:
+    tensors = {}
 
     for challenge_id in challenges_json:
-        challenge_and_solution_to_png(
-            working_dir,
-            challenge_id,
+        support_set_inputs, support_set_outputs, query_inputs, query_outputs = challenge_and_solution_to_tensors(
             challenges_json[challenge_id]['train'],
             challenges_json[challenge_id]['test'],
             solutions_json[challenge_id],
             permutations
         )
+
+        tensors[challenge_id] = {
+            'support_set_inputs': support_set_inputs,
+            'support_set_outputs': support_set_outputs,
+            'query_inputs': query_inputs,
+            'query_outputs': query_outputs
+        }
+
+    return tensors
