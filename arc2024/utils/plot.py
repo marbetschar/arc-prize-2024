@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from matplotlib import colors
 
 
-def tensor_pad(tensor: torch.Tensor, target_shape=(30, 30), pad_value=10):
+def __pad(tensor: torch.Tensor, target_shape=(30, 30), pad_value=10):
     vertical_pad = (target_shape[0] - tensor.shape[0]) / 2.0
     horizontal_pad = (target_shape[1] - tensor.shape[1]) / 2.0
 
@@ -22,7 +22,7 @@ def tensor_pad(tensor: torch.Tensor, target_shape=(30, 30), pad_value=10):
     return m(tensor)
 
 
-def tensor_plot(tensor: torch.Tensor, ax=plt, title: str = None):
+def tensor(tensor: torch.Tensor, ax=plt, title: str = None):
     transparent = (0, 0, 0, 0)
     cmap = colors.ListedColormap(
         ['black', 'gray', 'lightblue', 'blue', 'green', 'yellow', 'orange', 'red', 'darkred', 'pink', transparent])
@@ -39,8 +39,7 @@ def tensor_plot(tensor: torch.Tensor, ax=plt, title: str = None):
     ax.imshow(tensor.detach().numpy(), cmap=cmap, norm=norm)
 
 
-def challenge_plot(
-    challenge_id: str,
+def challenge(
     support_set_inputs: [torch.Tensor],
     support_set_outputs: [torch.Tensor],
     query_inputs: [torch.Tensor],
@@ -48,25 +47,22 @@ def challenge_plot(
     dpi: int = 300
 ):
     fig, ax = plt.subplots(len(support_set_inputs), 4)
-
-    fig.suptitle(f"Challenge {challenge_id}")
     fig.set_dpi(dpi)
 
     for i, support_set_input in enumerate(support_set_inputs):
         title = None
         if i == 0:
             title = 'Support Set'
-        tensor_plot(tensor_pad(support_set_input), ax=ax[i, 0], title=title)
-        tensor_plot(tensor_pad(support_set_outputs[i]), ax=ax[i, 1])
+        tensor(__pad(support_set_input), ax=ax[i, 0], title=title)
+        tensor(__pad(support_set_outputs[i]), ax=ax[i, 1])
 
         ax[i, 2].axis(False)
         ax[i, 3].axis(False)
 
     for i, query_input in enumerate(query_inputs):
-        title = None
-        if i == 0:
-            title = 'Query'
-        tensor_plot(tensor_pad(query_input), ax=ax[0, 2], title=title)
-        tensor_plot(tensor_pad(query_outputs[i]), ax=ax[0, 3])
+        tensor(__pad(query_input), ax=ax[0, 2], title='Query')
+        
+        if len(query_outputs) > i and query_outputs[i] is not None:
+            tensor(__pad(query_outputs[i]), ax=ax[0, 3])
 
     plt.show()
