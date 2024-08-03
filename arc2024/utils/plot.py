@@ -5,23 +5,6 @@ import matplotlib.pyplot as plt
 from matplotlib import colors
 
 
-def __pad(tensor: torch.Tensor, target_shape=(30, 30), pad_value=10):
-    vertical_pad = (target_shape[0] - tensor.shape[0]) / 2.0
-    horizontal_pad = (target_shape[1] - tensor.shape[1]) / 2.0
-
-    m = torch.nn.ConstantPad2d(
-        padding=(
-            math.floor(horizontal_pad),  # padding_left
-            math.ceil(horizontal_pad),  # padding_right
-            math.floor(vertical_pad),  # padding_top
-            math.ceil(vertical_pad)  # padding_bottom
-        ),
-        value=pad_value
-    )
-
-    return m(tensor)
-
-
 def tensor(tensor: torch.Tensor, ax=plt, title: str = None):
     transparent = (0, 0, 0, 0)
     cmap = colors.ListedColormap(
@@ -36,7 +19,7 @@ def tensor(tensor: torch.Tensor, ax=plt, title: str = None):
 
     ax.axis(False)
     ax.set_title(title)
-    ax.imshow(tensor.detach().numpy(), cmap=cmap, norm=norm)
+    ax.imshow(tensor.cpu().detach().numpy(), cmap=cmap, norm=norm)
 
 
 def challenge(
@@ -53,16 +36,33 @@ def challenge(
         title = None
         if i == 0:
             title = 'Support Set'
-        tensor(__pad(support_set_input), ax=ax[i, 0], title=title)
-        tensor(__pad(support_set_outputs[i]), ax=ax[i, 1])
+        tensor(support_set_input, ax=ax[i, 0], title=title)
+        tensor(support_set_outputs[i], ax=ax[i, 1])
 
         ax[i, 2].axis(False)
         ax[i, 3].axis(False)
 
     for i, query_input in enumerate(query_inputs):
-        tensor(__pad(query_input), ax=ax[0, 2], title='Query')
+        tensor(query_input, ax=ax[0, 2], title='Query')
         
         if len(query_outputs) > i and query_outputs[i] is not None:
-            tensor(__pad(query_outputs[i]), ax=ax[0, 3])
+            tensor(query_outputs[i], ax=ax[0, 3])
+
+    plt.show()
+
+
+def input_and_output(
+    X: torch.Tensor,
+    y: torch.Tensor,
+    y_pred: torch.Tensor = None,
+    dpi: int = 300
+):
+    fig, ax = plt.subplots(1, 3 if y_pred is not None else 2)
+    fig.set_dpi(dpi)
+
+    tensor(X, ax=ax[0], title='Input')
+    tensor(y, ax=ax[1], title='Correct Output')
+    if y_pred is not None:
+        tensor(y_pred, ax=ax[2], title='Predicted Output')
 
     plt.show()

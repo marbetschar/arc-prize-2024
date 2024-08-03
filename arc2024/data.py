@@ -3,6 +3,7 @@ from typing import Dict, List, Tuple
 import kaggle
 import json
 import os
+import math
 import shutil
 import torch
 
@@ -10,133 +11,64 @@ from pathlib import Path
 from zipfile import ZipFile
 
 
-class Dataset(torch.utils.data.Dataset):
+class Arc20204Dataset(torch.utils.data.Dataset):
+    @classmethod
+    def pad(cls, tensor: torch.Tensor, target_shape=(30, 30), pad_value=10):
+        vertical_pad = (target_shape[0] - tensor.shape[0]) / 2.0
+        horizontal_pad = (target_shape[1] - tensor.shape[1]) / 2.0
 
-    def __init__(
-        self,
-        dataset_dir: Path,
-        mode: str = 'training',
-        permutations: bool = False,
-        download: int = -1
-    ):
-        """
-        Dataset for ARC Prize 2024 competition. Can automatically download the dataset from kaggle.com
-
-        :param dataset_dir:
-        :param mode: `training`, `evaluation` or `test`
-        :param permutations: `True` if you automatically want to create variations of the provided support set data
-        :param download: `-1` = download if not already exists (default), `0` = don't download, `1` = always download
-        """
-
-        if mode not in ['training', 'evaluation', 'test']:
-            raise ValueError(f'mode {mode} is not supported')
-
-        if mode in ['evaluation', 'test']:
-            permutations = False
-
-        if download != 0:
-            self.__download(dataset_dir, download == 1)
-
-        challenges_json = self.__read_json_file(dataset_dir / f"arc-agi_{mode}_challenges.json")
-        solutions_json = {}
-
-        solutions_file_path = dataset_dir / f"arc-agi_{mode}_solutions.json"
-        if solutions_file_path.exists():
-            solutions_json = self.__read_json_file(solutions_file_path)
-
-        self.challenges = self.__pre_process_challenges_and_solutions(
-            challenges_json=challenges_json,
-            solutions_json=solutions_json,
-            permutations=permutations
+        m = torch.nn.ConstantPad2d(
+            padding=(
+                math.floor(horizontal_pad),  # padding_left
+                math.ceil(horizontal_pad),  # padding_right
+                math.floor(vertical_pad),  # padding_top
+                math.ceil(vertical_pad)  # padding_bottom
+            ),
+            value=pad_value
         )
-        self.challenge_keys = list(self.challenges.keys())
+
+        return m(tensor)
 
     @classmethod
-    def __pre_process_challenges_and_solutions(
-        cls,
-        challenges_json,
-        solutions_json,
-        permutations: bool = False
-    ) -> Dict[str, Dict[str, List[torch.Tensor]]]:
-        challenges = {}
+    def unpad(cls, input: torch.Tensor, pad_value=10):
+        input_mask = input[:, :] == pad_value
 
-        for challenge_id in challenges_json:
-            support_set_inputs, support_set_outputs, query_inputs, query_outputs = (
-                cls.__pre_process_challenge_and_solution(
-                    challenges_json[challenge_id]['train'],
-                    challenges_json[challenge_id]['test'],
-                    solutions_json.get(challenge_id, {}),
-                    permutations
-                )
-            )
+        # make sure we only remove rows and columns which contain pad_value only
+        dim0 = torch.all(input_mask, dim=0) == False
+        dim1 = torch.all(input_mask, dim=1) == False
 
-            challenges[challenge_id] = {
-                'support_set_inputs': support_set_inputs,
-                'support_set_outputs': support_set_outputs,
-                'query_inputs': query_inputs,
-                'query_outputs': query_outputs
-            }
+        input_unpadded = input[dim1, :][:, dim0]
 
-        return challenges
+        return input_unpadded
 
     @classmethod
-    def __pre_process_challenge_and_solution(
-        cls,
-        train_json,
-        test_json,
-        solution_json,
-        permutations: bool = False
-    ):
-        support_set_inputs = []
-        support_set_outputs = []
-        query_inputs = []
-        query_outputs = []
-
-        for i, train in enumerate(train_json):
-            support_set_input = torch.tensor(train['input'], dtype=torch.uint8).unsqueeze(0)
-            support_set_output = torch.tensor(train['output'], dtype=torch.uint8).unsqueeze(0)
-
-            support_set_inputs.append(support_set_input)
-            support_set_outputs.append(support_set_output)
-
-        if permutations:
-            support_set_inputs += cls.__generate_permutations(support_set_inputs)
-            support_set_outputs += cls.__generate_permutations(support_set_outputs)
-
-        for i, test in enumerate(test_json):
-            query_input = torch.tensor(test['input'], dtype=torch.uint8).unsqueeze(0)
-
-            query_output = None
-            if len(solution_json) > i:
-                query_output = torch.tensor(solution_json[i], dtype=torch.uint8).unsqueeze(0)
-
-            query_inputs.append(query_input)
-            query_outputs.append(query_output)
-
-        if permutations:
-            query_inputs += cls.__generate_permutations(query_inputs)
-            query_outputs += cls.__generate_permutations(query_outputs)
-
-        return support_set_inputs, support_set_outputs, query_inputs, query_outputs
-
-    @classmethod
-    def __generate_permutations(cls, origins: List[torch.Tensor]) -> List[torch.Tensor]:
+    def generate_permutations(
+            cls,
+            challenge_tensor: torch.Tensor,
+            solution_tensor: torch.Tensor
+    ) -> List[Tuple[torch.Tensor, torch.Tensor]]:
         permutations = []
 
         for i in range(1, 11, 1):
-            for origin in origins:
-                permutation = (torch.clone(origin).squeeze(0) + i) % 10
-                permutation = permutation.unsqueeze(0)
+            challenge_permutated = cls.unpad(torch.clone(challenge_tensor).squeeze(0))
+            challenge_permutated = (challenge_permutated + i) % 10
+            challenge_permutated = cls.pad(challenge_permutated).unsqueeze(0)
 
-                if torch.equal(origin, permutation):
-                    continue
+            solution_permutated = cls.unpad(torch.clone(solution_tensor).squeeze(0))
+            solution_permutated = (solution_permutated + i) % 10
+            solution_permutated = cls.pad(solution_permutated).unsqueeze(0)
 
-                permutations.append(permutation)
+            if not torch.equal(challenge_tensor, challenge_permutated) or (
+                    not torch.equal(solution_tensor, solution_permutated)
+            ):
+                permutations.append(
+                    (challenge_permutated, solution_permutated)
+                )
 
         return permutations
 
     @classmethod
-    def __download(cls, dataset_dir: Path, force: bool = False, competition='arc-prize-2024'):
+    def download(cls, dataset_dir: Path, force: bool = False, competition='arc-prize-2024'):
         if not force and dataset_dir.is_dir() and len(os.listdir(dataset_dir)) > 1:
             return
         elif dataset_dir.is_dir():
@@ -158,24 +90,110 @@ class Dataset(torch.utils.data.Dataset):
             os.remove(zip_file_path)
 
     @classmethod
-    def __read_json_file(cls, file_path: Path):
+    def read_json_file(cls, file_path: Path):
         file = open(file_path, 'r')
         json_data = json.loads(file.read())
         file.close()
         return json_data
 
-    def __len__(self) -> int:
-        return len(self.challenge_keys)
 
-    def __getitem__(self, index: int) -> Tuple[
-        List[torch.Tensor], List[torch.Tensor], List[torch.Tensor], List[torch.Tensor]
-    ]:
-        key = self.challenge_keys[index]
-        challenge = self.challenges[key]
+class ZeroShotDataset(Arc20204Dataset):
 
-        return (
-            challenge['support_set_inputs'],
-            challenge['support_set_outputs'],
-            challenge['query_inputs'],
-            challenge['query_outputs']
+    def __init__(
+            self,
+            dataset_dir: Path,
+            dataset_name: str = 'training',
+            mode: str = 'train',
+            permutations: bool = False,
+            download: int = -1
+    ):
+        """
+        Dataset which loads data from ARC 2024 dataset and provides a challenge along with its solution.
+        `ZeroShotDataset` does not differentiate between `train` and `test` samples within a set of challenges.
+
+        :param dataset_dir:
+        :param dataset_name: `training`, `evaluation` or `test`
+        :param mode: `train` or `test`
+        :param permutations: `True` if you automatically want to create variations of the provided support set data
+        :param download: `-1` = download if not already exists (default), `0` = don't download, `1` = always download
+        """
+
+        if dataset_name not in ['training', 'evaluation', 'test']:
+            raise ValueError(f'dataset_name {dataset_name} is not supported')
+
+        if mode not in ['train', 'test']:
+            raise ValueError(f'mode {mode} is not supported')
+
+        if dataset_name in ['evaluation', 'test']:
+            permutations = False
+
+        if download != 0:
+            self.download(dataset_dir, download == 1)
+
+        challenges_json = self.read_json_file(dataset_dir / f"arc-agi_{dataset_name}_challenges.json")
+        solutions_json = {}
+
+        solutions_file_path = dataset_dir / f"arc-agi_{dataset_name}_solutions.json"
+        if solutions_file_path.exists():
+            solutions_json = self.read_json_file(solutions_file_path)
+
+        self.challenges = self.pre_process_challenges_and_solutions(
+            mode=mode,
+            challenges_json=challenges_json,
+            solutions_json=solutions_json,
+            permutations=permutations
         )
+
+    @classmethod
+    def pre_process_challenges_and_solutions(
+            cls,
+            mode: str,
+            challenges_json,
+            solutions_json,
+            permutations: bool = False
+    ) -> List[Tuple[torch.Tensor, torch.Tensor]]:
+        challenges = []
+
+        for challenge_id in challenges_json:
+            challenge_json = challenges_json[challenge_id]
+            solution_json = solutions_json[challenge_id]
+
+            if mode == 'test':
+                for i, test in enumerate(challenge_json['test']):
+                    challenges += cls.pre_process_challenge_and_solution(
+                        test['input'],
+                        solution_json[i],
+                        permutations=permutations
+                    )
+
+            else:
+                for train_json in challenge_json['train']:
+                    challenges += cls.pre_process_challenge_and_solution(
+                        train_json['input'],
+                        train_json['output'],
+                        permutations=permutations
+                    )
+
+        return challenges
+
+    @classmethod
+    def pre_process_challenge_and_solution(
+            cls,
+            challenge_json,
+            solution_json,
+            permutations: bool = False
+    ) -> List[Tuple[torch.Tensor, torch.Tensor]]:
+        challenge_tensor = cls.pad(torch.tensor(challenge_json, dtype=torch.float)).unsqueeze(0)
+        solution_tensor = cls.pad(torch.tensor(solution_json, dtype=torch.float)).unsqueeze(0)
+
+        challenge_and_solution_tensors = [(challenge_tensor, solution_tensor)]
+        if permutations:
+            challenge_and_solution_tensors += cls.generate_permutations(challenge_tensor, solution_tensor)
+
+        return challenge_and_solution_tensors
+
+    def __len__(self) -> int:
+        return len(self.challenges)
+
+    def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
+        return self.challenges[index]
