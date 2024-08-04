@@ -18,4 +18,5 @@ For more information see: https://www.kaggle.com/competitions/arc-prize-2024
 
 ## Model Experiments
 
-- [Linear Model V0](LinearModelV0.ipynb)
+- [Linear Model V0 with Zero Shot Dataset](LinearModelV0-ZeroShotDataset.ipynb)
+- [Non-Linear Model V0 with Zero Shot Dataset](NonLinearModelV0-ZeroShotDataset.ipynb)
