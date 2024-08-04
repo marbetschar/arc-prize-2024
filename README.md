@@ -12,9 +12,10 @@ Create an AI capable of solving reasoning tasks it has never seen before
 
 For more information see: https://www.kaggle.com/competitions/arc-prize-2024
 
-## Data Exploration
+## Datasets
 
-- [Explore Dataset](Explore-Dataset.ipynb)
+- [Zero Shot Dataset](Explore-ZeroShotDataset.ipynb)
+- [Few Shot Dataset](Explore-FewShotDataset.ipynb)
 
 ## Model Experiments
 
@@ -26,3 +27,4 @@ For more information see: https://www.kaggle.com/competitions/arc-prize-2024
 ### Non-Linear Model V0
 
 - [Zero Shot Dataset](NonLinearModelV0-ZeroShotDataset.ipynb)
+- [Few Shot Dataset](NonLinearModelV0-FewShotDataset.ipynb)
