@@ -271,43 +271,44 @@ class FewShotDataset(Arc20204Dataset):
 
     def get_samples(self, challenge_id: str, max_samples: int = -1) -> Tuple[torch.Tensor, torch.Tensor]:
         all_samples = self.train_challenges[challenge_id]
-        samples = random.sample(
-            all_samples,
-            k=min(max_samples, len(all_samples))
-        )
+        k = min(max_samples, len(all_samples)) if max_samples > 0 else len(all_samples)
+
+        samples = random.sample(all_samples, k)
 
         x_sample = []
         y_sample = []
-        for X, y in samples:
-            x_sample.append(X)
+        for sample in samples:
+            x, y = sample
+            x_sample.append(x)
             y_sample.append(y)
 
         return torch.stack(x_sample), torch.stack(y_sample)
 
     def pre_process_challenges_and_solutions(
-                self,
-                challenges_json,
-                solutions_json
-        ) -> Tuple[Dict, List]:
-            train_challenges = {}
-            test_challenges = []
+            self,
+            challenges_json,
+            solutions_json
+    ) -> Tuple[Dict, List]:
+        train_challenges = {}
+        test_challenges = []
 
-            for challenge_id in challenges_json:
-                challenge_json = challenges_json[challenge_id]
-                solution_json = solutions_json[challenge_id]
+        for challenge_id in challenges_json:
+            challenge_json = challenges_json[challenge_id]
+            solution_json = solutions_json[challenge_id]
 
-                for i, test in enumerate(challenge_json['test']):
-                    test_challenges += self.pre_process_challenge_and_solution(
-                        challenge_json=test['input'],
-                        solution_json=solution_json[i],
-                        map_lambda=lambda x, y: (x, y, challenge_id)
-                    )
+            for i, test in enumerate(challenge_json['test']):
+                test_challenges += self.pre_process_challenge_and_solution(
+                    challenge_json=test['input'],
+                    solution_json=solution_json[i],
+                    map_lambda=lambda x, y: (x, y, challenge_id)
+                )
 
-                for train_json in challenge_json['train']:
-                    train_challenges[challenge_id] = self.pre_process_challenge_and_solution(
-                        challenge_json=train_json['input'],
-                        solution_json=train_json['output'],
-                        map_lambda=lambda x, y: (x, y)
-                    )
+            train_challenges[challenge_id] = []
+            for train_json in challenge_json['train']:
+                train_challenges[challenge_id] += self.pre_process_challenge_and_solution(
+                    challenge_json=train_json['input'],
+                    solution_json=train_json['output'],
+                    map_lambda=lambda x, y: (x, y)
+                )
 
-            return train_challenges, test_challenges
+        return train_challenges, test_challenges
