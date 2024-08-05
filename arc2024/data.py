@@ -164,9 +164,8 @@ class ZeroShotDataset(Arc20204Dataset):
             solutions_json=solutions_json
         )
 
-    @classmethod
     def pre_process_challenges_and_solutions(
-            cls,
+            self,
             mode: str,
             challenges_json,
             solutions_json
@@ -179,14 +178,14 @@ class ZeroShotDataset(Arc20204Dataset):
 
             if mode == 'test':
                 for i, test in enumerate(challenge_json['test']):
-                    challenges += cls.pre_process_challenge_and_solution(
+                    challenges += self.pre_process_challenge_and_solution(
                         test['input'],
                         solution_json[i]
                     )
 
             else:
                 for train_json in challenge_json['train']:
-                    challenges += cls.pre_process_challenge_and_solution(
+                    challenges += self.pre_process_challenge_and_solution(
                         train_json['input'],
                         train_json['output']
                     )

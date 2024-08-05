@@ -28,3 +28,8 @@ For more information see: https://www.kaggle.com/competitions/arc-prize-2024
 
 - [Zero Shot Dataset](NonLinearModelV0-ZeroShotDataset.ipynb)
 - [Few Shot Dataset](NonLinearModelV0-FewShotDataset.ipynb)
+
+### Transformer Model V0
+
+- [Zero Shot Dataset](TransformerModelV0-ZeroShotDataset.ipynb)
+- [Few Shot Dataset](TransformerModelV0-FewShotDataset.ipynb)

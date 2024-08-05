@@ -9,7 +9,7 @@ class NonLinearModelV0(torch.nn.Module):
             hidden_features: int,
             out_features: int
     ):
-        super(NonLinearModelV0, self).__init__()
+        super().__init__()
 
         out_features_sqrt = math.sqrt(in_features)
 
