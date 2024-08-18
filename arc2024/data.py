@@ -158,7 +158,7 @@ class ZeroShotDataset(Arc20204Dataset):
         if solutions_file_path.exists():
             solutions_json = self.read_json_file(solutions_file_path)
 
-        self.challenges = self.pre_process_challenges_and_solutions(
+        self.challenges, self.challenge_ids = self.pre_process_challenges_and_solutions(
             mode=mode,
             challenges_json=challenges_json,
             solutions_json=solutions_json
@@ -169,8 +169,9 @@ class ZeroShotDataset(Arc20204Dataset):
             mode: str,
             challenges_json,
             solutions_json
-    ) -> List[Tuple[torch.Tensor, torch.Tensor]]:
+    ) -> Tuple[List[Tuple[torch.Tensor, torch.Tensor]], List[str]]:
         challenges = []
+        challenge_ids = []
 
         for challenge_id in challenges_json:
             challenge_json = challenges_json[challenge_id]
@@ -182,6 +183,7 @@ class ZeroShotDataset(Arc20204Dataset):
                         test['input'],
                         solution_json[i]
                     )
+                    challenge_ids += [challenge_id]
 
             else:
                 for train_json in challenge_json['train']:
@@ -189,8 +191,9 @@ class ZeroShotDataset(Arc20204Dataset):
                         train_json['input'],
                         train_json['output']
                     )
+                    challenge_ids += [challenge_id]
 
-        return challenges
+        return challenges, challenge_ids
 
     def pre_process_challenge_and_solution(
             self,
@@ -210,6 +213,9 @@ class ZeroShotDataset(Arc20204Dataset):
 
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
         return self.challenges[index]
+
+    def get_id(self, index: int) -> str:
+        return self.challenge_ids[index]
 
 
 class FewShotDataset(Arc20204Dataset):
