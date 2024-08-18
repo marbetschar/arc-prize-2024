@@ -12,10 +12,11 @@ Create an AI capable of solving reasoning tasks it has never seen before
 
 For more information see: https://www.kaggle.com/competitions/arc-prize-2024
 
-## Datasets
+## Exploration
 
 - [Zero Shot Dataset](Explore-ZeroShotDataset.ipynb)
 - [Few Shot Dataset](Explore-FewShotDataset.ipynb)
+- [Difficulty Metric](Explore-Difficulty-Metric.ipynb)
 
 ## Model Experiments
 
@@ -33,3 +34,7 @@ For more information see: https://www.kaggle.com/competitions/arc-prize-2024
 
 - [Zero Shot Dataset](TransformerModelV0-ZeroShotDataset.ipynb)
 - [Few Shot Dataset](TransformerModelV0-FewShotDataset.ipynb)
+
+### DreamCoder
+
+- [Dream Coder](DreamCoder.ipynb)

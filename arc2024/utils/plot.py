@@ -4,6 +4,12 @@ import matplotlib.pyplot as plt
 
 from matplotlib import colors
 
+def as_is(tensor: torch.Tensor):
+    # remove batch size and color channel from tensor if necessary (assuming these are first):
+    while tensor.ndim > 2:
+        tensor = tensor.squeeze(0)
+
+    plt.imshow(tensor.cpu().detach().numpy())
 
 def tensor(tensor: torch.Tensor, ax=plt, title: str = None):
     transparent = (0, 0, 0, 0)
@@ -18,7 +24,8 @@ def tensor(tensor: torch.Tensor, ax=plt, title: str = None):
         tensor = tensor.squeeze(0)
 
     ax.axis(False)
-    ax.set_title(title)
+    if title is not None:
+        ax.set_title(title)
     ax.imshow(tensor.cpu().detach().numpy(), cmap=cmap, norm=norm)
 
 
@@ -55,6 +62,7 @@ def input_and_output(
     X: torch.Tensor,
     y: torch.Tensor,
     y_pred: torch.Tensor = None,
+    y_pred_title: str = 'Predicted Output',
     dpi: int = 300
 ):
     fig, ax = plt.subplots(1, 3 if y_pred is not None else 2)
@@ -63,6 +71,6 @@ def input_and_output(
     tensor(X, ax=ax[0], title='Input')
     tensor(y, ax=ax[1], title='Correct Output')
     if y_pred is not None:
-        tensor(y_pred, ax=ax[2], title='Predicted Output')
+        tensor(y_pred, ax=ax[2], title=y_pred_title)
 
     plt.show()
