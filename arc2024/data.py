@@ -275,6 +275,9 @@ class FewShotDataset(Arc20204Dataset):
         return self.test_challenges[index]
 
     def get_samples(self, challenge_id: str, max_samples: int = -1) -> Tuple[torch.Tensor, torch.Tensor]:
+        if challenge_id not in self.train_challenges:
+            raise KeyError(f'Challenge {challenge_id} not found in training challenges.')
+
         all_samples = self.train_challenges[challenge_id]
         k = min(max_samples, len(all_samples)) if max_samples > 0 else len(all_samples)
 
