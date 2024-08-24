@@ -42,6 +42,27 @@ class Arc20204Dataset(torch.utils.data.Dataset):
             self.download(dataset_dir, download == 1)
 
     @classmethod
+    def blow(cls, tensor: torch.Tensor, target_shape=(30, 30), pad_value=10):
+        padding_right = (target_shape[1] - tensor.shape[1])
+        padding_bottom = (target_shape[0] - tensor.shape[0])
+
+        m = torch.nn.ConstantPad2d(
+            padding=(
+                0,  # padding_left
+                padding_right,
+                0,  # padding_top
+                padding_bottom
+            ),
+            value=pad_value
+        )
+
+        return m(tensor)
+
+    # TODO - We must ensure the image is centered here. Otherwise all operations requiring symmetry
+    # will not yield correct results (e.g. vertical mirroring) and are therefore hard to compare.
+    # An even better approach would be to get rid of padding completely to avoid this issue
+    # in the first place.
+    @classmethod
     def pad(cls, tensor: torch.Tensor, target_shape=(30, 30), pad_value=10):
         vertical_pad = (target_shape[0] - tensor.shape[0]) / 2.0
         horizontal_pad = (target_shape[1] - tensor.shape[1]) / 2.0
@@ -245,9 +266,11 @@ class FewShotDataset(Arc20204Dataset):
         if solutions_file_path.exists():
             solutions_json = self.read_json_file(solutions_file_path)
 
-        self.train_challenges, self.test_challenges = self.pre_process_challenges_and_solutions(
-            challenges_json=challenges_json,
-            solutions_json=solutions_json
+        self.train_challenges, self.test_challenges, self.test_challenge_ids = (
+            self.pre_process_challenges_and_solutions(
+                challenges_json=challenges_json,
+                solutions_json=solutions_json
+            )
         )
 
     def pre_process_challenge_and_solution(
@@ -272,6 +295,9 @@ class FewShotDataset(Arc20204Dataset):
         return len(self.test_challenges)
 
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor, str]:
+        a, b, _ = self.test_challenges[index]
+        if torch.equal(a, b):
+            raise ValueError("Cannot be equal")
         return self.test_challenges[index]
 
     def get_samples(self, challenge_id: str, max_samples: int = -1) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -296,15 +322,17 @@ class FewShotDataset(Arc20204Dataset):
             self,
             challenges_json,
             solutions_json
-    ) -> Tuple[Dict, List]:
+    ) -> Tuple[Dict, List, List]:
         train_challenges = {}
         test_challenges = []
+        test_challenge_ids = []
 
         for challenge_id in challenges_json:
             challenge_json = challenges_json[challenge_id]
             solution_json = solutions_json[challenge_id]
 
             for i, test in enumerate(challenge_json['test']):
+                test_challenge_ids.append(challenge_id)
                 test_challenges += self.pre_process_challenge_and_solution(
                     challenge_json=test['input'],
                     solution_json=solution_json[i],
@@ -319,4 +347,4 @@ class FewShotDataset(Arc20204Dataset):
                     map_lambda=lambda x, y: (x, y)
                 )
 
-        return train_challenges, test_challenges
+        return train_challenges, test_challenges, test_challenge_ids
