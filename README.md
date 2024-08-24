@@ -18,6 +18,7 @@ For more information see: https://www.kaggle.com/competitions/arc-prize-2024
 - [Few Shot Dataset](Explore-FewShotDataset.ipynb)
 - [Differences](Explore-Differences.ipynb)
 - [Difficulty Metric](Explore-Difficulty-Metric.ipynb)
+- [DSL](Explore-DLS.ipynb)
 
 ## Model Experiments
 
