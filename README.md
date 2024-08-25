@@ -17,7 +17,7 @@ For more information see: https://www.kaggle.com/competitions/arc-prize-2024
 - [Zero Shot Dataset](Explore-ZeroShotDataset.ipynb)
 - [Few Shot Dataset](Explore-FewShotDataset.ipynb)
 - [Differences](Explore-Differences.ipynb)
-- [Difficulty Metric](Explore-Difficulty-Metric.ipynb)
+- [SSIM Metric](Explore-SSIM-Metric.ipynb)
 - [DSL](Explore-DLS.ipynb)
 
 ## Model Experiments
